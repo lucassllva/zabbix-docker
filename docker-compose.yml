@@ -12,7 +12,10 @@ services:
     volumes:
       - ./mysql:/var/lib/mysql         # Volume persistente para armazenar dados do banco de dados.
     restart: unless-stopped            # Reiniciar o contêiner caso ele pare.
-  
+    networks:
+      my_network:
+        ipv4_address: 172.30.2.179
+
   # Serviço do Zabbix Server
   zabbix-server:
     image: zabbix/zabbix-server-mysql:latest
@@ -29,24 +32,28 @@ services:
     volumes:
       - ./zabbix-server:/var/lib/zabbix # Volume persistente para dados de configuração do Zabbix.
     restart: unless-stopped
+    networks:
+      my_network:
 
   # Serviço da interface web (Nginx + PHP)
   zabbix-web:
     image: zabbix/zabbix-web-nginx-mysql:latest
     environment:
-      DB_SERVER_HOST: db               # Nome do serviço do banco de dados.
-      MYSQL_DATABASE: zabbix           # Nome do banco de dados, deve ser o mesmo que o usado no "db" e "zabbix-server".
-      MYSQL_USER: zabbix               # Usuário do banco de dados, mesmo que em "db" e "zabbix-server".
-      MYSQL_PASSWORD: z@771x_p@ss!      # Senha do banco de dados, deve ser a mesma usada no "db" e "zabbix-server".
+      DB_SERVER_HOST: db_zabbix               # Nome do serviço do banco de dados.
+      MYSQL_DATABASE: zabbix                  # Nome do banco de dados, deve ser o mesmo que o usado no "db" e "zabbix-server".
+      MYSQL_USER: zabbix                      # Usuário do banco de dados, mesmo que em "db" e "zabbix-server".
+      MYSQL_PASSWORD: z@771x_p@ss!           # Senha do banco de dados, deve ser a mesma usada no "db" e "zabbix-server".
       MYSQL_ROOT_PASSWORD: z@771x_p@ssr00t   # Senha do root do MySQL.
-      ZBX_SERVER_HOST: zabbix-server   # Nome do serviço do Zabbix Server. Deve ser "zabbix-server" para conectar ao serviço correto.
-      PHP_TZ: America/Sao_Paulo            # Fuso horário a ser usado no PHP. Altere de acordo com sua localização, ex.: "America/Sao_Paulo".
+      ZBX_SERVER_HOST: zabbix-server         # Nome do serviço do Zabbix Server. Deve ser "zabbix-server" para conectar ao serviço correto.
+      PHP_TZ: America/Sao_Paulo              # Fuso horário a ser usado no PHP. Altere de acordo com sua localização, ex.: "America/Sao_Paulo".
     ports:
       - "80:8080"                      # Porta HTTP exposta. Acesse a interface web do Zabbix em http://localhost.
       - "443:8443"                     # Porta HTTPS exposta. Acesse a interface segura em https://localhost.
     depends_on:
       - zabbix-server                  # O serviço da web só iniciará após o Zabbix Server estar rodando.
     restart: unless-stopped
+    networks:
+      my_network:
 
   # Serviço do agente Zabbix
   zabbix-agent:
@@ -56,8 +63,10 @@ services:
     depends_on:
       - zabbix-server                  # O agente só iniciará após o Zabbix Server estar rodando.
     restart: unless-stopped
-    
-    # Serviço do Grafana
+    networks:
+      my_network:
+
+  # Serviço do Grafana
   grafana:
     image: grafana/grafana:latest
     environment:
@@ -70,3 +79,12 @@ services:
     depends_on:
       - zabbix-server                          # Espera o Zabbix Server estar disponível antes de iniciar o Grafana.
     restart: unless-stopped
+    networks:
+      my_network:
+
+networks:
+  my_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "172.30.0.0/16"
