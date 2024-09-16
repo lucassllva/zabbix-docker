@@ -1,0 +1,72 @@
+version: '3.5'
+
+services:
+  # Serviço do banco de dados MySQL
+  db_zabbix:
+    image: mysql:8.0
+    environment:
+      MYSQL_DATABASE: zabbix                # Nome do banco de dados. Aconselhado manter "zabbix".
+      MYSQL_USER: zabbix                    # Nome do usuário que o Zabbix Server usará para conectar. Altere se desejar.
+      MYSQL_PASSWORD: z@771x_p@ss!          # Senha do usuário do banco de dados. Aconselhado alterar para uma senha segura.
+      MYSQL_ROOT_PASSWORD: z@771x_p@ssr00t  # Senha para o usuário root do MySQL. Aconselhado alterar para algo seguro.
+    volumes:
+      - ./mysql:/var/lib/mysql         # Volume persistente para armazenar dados do banco de dados.
+    restart: unless-stopped            # Reiniciar o contêiner caso ele pare.
+  
+  # Serviço do Zabbix Server
+  zabbix-server:
+    image: zabbix/zabbix-server-mysql:latest
+    environment:
+      DB_SERVER_HOST: db_zabbix        # Nome do serviço do banco de dados, deve ser "db_zabbix" para conectar ao contêiner MySQL.
+      MYSQL_DATABASE: zabbix           # Nome do banco de dados, deve ser o mesmo que o usado no serviço "db_zabbix".
+      MYSQL_USER: zabbix               # Usuário do banco de dados, mesmo que em "db_zabbix".
+      MYSQL_PASSWORD: z@771x_p@ss!     # Senha do banco de dados, deve ser a mesma usada no "db_zabbix".
+      MYSQL_ROOT_PASSWORD: z@771x_p@ssr00t   # Senha do root do MySQL, mesma usada no "db_zabbix".
+    depends_on:
+      - db_zabbix                             # O Zabbix Server só iniciará após o serviço do banco de dados estar rodando.
+    ports:
+      - "10051:10051"                  # Porta de comunicação do Zabbix Server, exposta para comunicação com agentes e outras instâncias Zabbix.
+    volumes:
+      - ./zabbix-server:/var/lib/zabbix # Volume persistente para dados de configuração do Zabbix.
+    restart: unless-stopped
+
+  # Serviço da interface web (Nginx + PHP)
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-mysql:latest
+    environment:
+      DB_SERVER_HOST: db               # Nome do serviço do banco de dados.
+      MYSQL_DATABASE: zabbix           # Nome do banco de dados, deve ser o mesmo que o usado no "db" e "zabbix-server".
+      MYSQL_USER: zabbix               # Usuário do banco de dados, mesmo que em "db" e "zabbix-server".
+      MYSQL_PASSWORD: z@771x_p@ss!      # Senha do banco de dados, deve ser a mesma usada no "db" e "zabbix-server".
+      MYSQL_ROOT_PASSWORD: z@771x_p@ssr00t   # Senha do root do MySQL.
+      ZBX_SERVER_HOST: zabbix-server   # Nome do serviço do Zabbix Server. Deve ser "zabbix-server" para conectar ao serviço correto.
+      PHP_TZ: America/Sao_Paulo            # Fuso horário a ser usado no PHP. Altere de acordo com sua localização, ex.: "America/Sao_Paulo".
+    ports:
+      - "80:8080"                      # Porta HTTP exposta. Acesse a interface web do Zabbix em http://localhost.
+      - "443:8443"                     # Porta HTTPS exposta. Acesse a interface segura em https://localhost.
+    depends_on:
+      - zabbix-server                  # O serviço da web só iniciará após o Zabbix Server estar rodando.
+    restart: unless-stopped
+
+  # Serviço do agente Zabbix
+  zabbix-agent:
+    image: zabbix/zabbix-agent:latest
+    environment:
+      ZBX_SERVER_HOST: zabbix-server   # Nome do serviço do Zabbix Server ao qual o agente deve reportar.
+    depends_on:
+      - zabbix-server                  # O agente só iniciará após o Zabbix Server estar rodando.
+    restart: unless-stopped
+    
+    # Serviço do Grafana
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin           # Usuário admin do Grafana. Aconselhável alterar.
+      GF_SECURITY_ADMIN_PASSWORD: admin_pass  # Senha do usuário admin. Aconselhável alterar para algo seguro.
+    ports:
+      - "3000:3000"                           # Porta padrão do Grafana. Acesse o Grafana em http://localhost:3000.
+    volumes:
+      - ./grafana:/var/lib/grafana             # Volume persistente para dados de configuração do Grafana.
+    depends_on:
+      - zabbix-server                          # Espera o Zabbix Server estar disponível antes de iniciar o Grafana.
+    restart: unless-stopped
