@@ -75,7 +75,7 @@ services:
     image: grafana/grafana-oss:latest  # Usa a versão mais recente do Grafana Open Source
     container_name: grafana  # Nome do container
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD: grafana_pass  # Senha do administrador do Grafana (pode ser alterada)
+      - GF_SECURITY_ADMIN_PASSWORD=grafana_pass  # Senha do administrador do Grafana (pode ser alterada)
     depends_on:
       - zabbix-server  # Certifica-se de que o Zabbix Server esteja rodando
     networks:
