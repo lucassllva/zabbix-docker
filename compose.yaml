@@ -79,7 +79,7 @@
               - mysql-server
             restart: unless-stopped
             networks:
-              - zabbix-network
+              - network-zabbix
         
         networks:
             network-zabbix:
