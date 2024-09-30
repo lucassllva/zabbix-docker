@@ -1,0 +1,91 @@
+##Docker Compose Zabbix##            
+    services:
+        mysql-server:
+            image: mysql:8.0
+            environment:
+                MYSQL_ROOT_PASSWORD: senha1234@
+                MYSQL_DATABASE: zabbix
+                MYSQL_USER: zabbix
+                MYSQL_PASSWORD: senha1234@
+            ports:
+                - 3306:3306         
+            networks:
+                - network-zabbix           
+            volumes:
+                - mysql_db:/var/lib/mysql
+            restart: unless-stopped
+        
+        zabbix-server:
+            image: zabbix/zabbix-server-mysql:ubuntu-7.0-latest
+            environment:
+                DB_SERVER_HOST: mysql-server_db
+                MYSQL_DATABASE: zabbix
+                MYSQL_USER: zabbix
+                MYSQL_PASSWORD: senha1234@
+                MYSQL_ROOT_PASSWORD: senha1234@
+            depends_on:
+              - mysql-server
+            volumes:
+                - zabbix_data:/var/lib/zabbix
+            restart: unless-stopped
+            ports:
+                - 10051:10051
+            networks:
+                - network-zabbix
+                
+        zabbix-frontend-web:
+            image: zabbix/zabbix-web-apache-mysql:ubuntu-7.0-latest
+            environment:
+                ZBX_SERVER_HOST: zabbix-server
+                DB_SERVER_HOST: mysql-server
+                MYSQL_DATABASE: zabbix
+                MYSQL_USER: zabbix
+                MYSQL_PASSWORD: senha1234@
+                MYSQL_ROOT_PASSWORD: senha1234@
+            ports:
+              - 8080:8080 # HTTP
+              - 8443:8443 # HTTPS
+            depends_on:
+              - zabbix-server
+              - mysql-server
+            restart: unless-stopped
+            networks:
+              - network-zabbix
+              
+        zabbix-agent:
+            image: zabbix/zabbix-agent:ubuntu-7.0-latest
+            environment:
+                ZBX_SERVER_HOST: zabbix-server
+                ZBX_HOSTNAME: zabbix-agent
+            depends_on:
+              - zabbix-server
+            restart: unless-stopped
+            ports:
+              - 10050:10050
+            networks:
+              - network-zabbix
+        # Grafana
+        grafana:
+            image: grafana/grafana:11.0.0
+            environment:
+              GF_SECURITY_ADMIN_USER: admin
+              GF_SECURITY_ADMIN_PASSWORD: admin
+            volumes:
+              - grafana_data:/var/lib/grafana
+            ports:
+              - 3000:3000
+            depends_on:
+              - zabbix-server
+              - mysql-server
+            restart: unless-stopped
+            networks:
+              - zabbix-network
+        
+        networks:
+            network-zabbix:
+                driver: bridge
+        
+        volumes:
+            mysql_db:
+            zabbix_data:
+            grafana_data:
